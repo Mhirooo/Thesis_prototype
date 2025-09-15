@@ -4,6 +4,10 @@ from sentence_transformers import SentenceTransformer
 import joblib
 import chromadb
 import os
+import sys
+
+# Add the parent directory to the path so we can import from instance
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 db = SQLAlchemy()
 model = None
@@ -14,8 +18,9 @@ jobs_collection = None
 def create_app():
     app = Flask(__name__)
     
-    # Load configuration
-    app.config.from_pyfile('config.py', silent=False)
+    # Load configuration from the Config class
+    from instance.config import Config
+    app.config.from_object(Config)
     
     # Initialize extensions
     db.init_app(app)
@@ -24,8 +29,11 @@ def create_app():
     global model, kmeans_model, chroma_client, jobs_collection
     try:
         model = SentenceTransformer('all-MiniLM-L6-v2')
-        kmeans_model = joblib.load('../data/kmeans_model.pkl')
-        chroma_client = chromadb.PersistentClient(path="../chroma_storage")
+        
+        # Update paths to be relative to the project root
+        project_root = os.path.join(os.path.dirname(__file__), '..')
+        kmeans_model = joblib.load(os.path.join(project_root, 'data', 'kmeans_model.pkl'))
+        chroma_client = chromadb.PersistentClient(path=os.path.join(project_root, 'chroma_storage'))
         jobs_collection = chroma_client.get_or_create_collection(name="jobs")
         print("ML models and ChromaDB initialized successfully")
     except Exception as e:
