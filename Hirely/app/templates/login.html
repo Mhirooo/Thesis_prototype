@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - MyApp</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8fefc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        /* ✅ Left-side text much bigger & bolder */
+        .logo-container {
+            text-align: left;
+            flex: 1;
+            margin-left: 40px;
+        }
+
+        .logo-container img {
+            width: 110px;
+            height: 110px;
+            margin-bottom: 15px;
+        }
+
+        .logo-container h1 {
+            color: #2eccb0;
+            font-size: 48px; /* 🔥 Bigger main text */
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -1px; /* more compact like Facebook */
+        }
+
+        .logo-container p {
+            color: #444;
+            font-size: 20px; /* 🔥 Bigger subtext */
+            max-width: 400px;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        /* ✅ Login form stays on right */
+        .login-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            width: 350px;
+            margin-left: auto;
+            margin-right: 60px;
+        }
+
+        /* Unified styling for inputs & buttons */
+        .input-field,
+        .login-btn,
+        .create-account {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            box-sizing: border-box;
+        }
+
+        .input-field {
+            background-color: #f9f9f9;
+            border: 2px solid #e0f4ef;
+            color: #333;
+            transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+            border-color: #2eccb0;
+            outline: none;
+            background-color: #ffffff;
+        }
+
+        .login-btn {
+            background-color: #2eccb0;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .login-btn:hover {
+            background-color: #27b89f;
+        }
+
+        .login-box .link {
+            display: block;
+            text-align: center;
+            margin: 8px 0;
+            color: #2eccb0;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .login-box .link:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            border-top: 1px solid #eee;
+            margin: 12px 0;
+        }
+
+        .create-account {
+            display: block;
+            text-align: center;
+            background-color: #34d399;
+            color: white;
+            text-decoration: none;
+            transition: background-color 0.2s ease;
+        }
+
+        .create-account:hover {
+            background-color: #2bb483;
+        }
+
+        .error {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        /* ✅ Mobile responsiveness */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+                gap: 30px;
+                text-align: center;
+            }
+
+            .logo-container {
+                margin-left: 0;
+                text-align: center;
+            }
+
+            .logo-container img {
+                width: 80px;
+                height: 80px;
+            }
+
+            .logo-container h1 {
+                font-size: 36px;
+            }
+
+            .logo-container p {
+                font-size: 16px;
+                max-width: none;
+            }
+
+            .login-box {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Brand section (left) -->
+        <div class="logo-container">
+            <img src="/static/hirely.png" alt="MyApp Logo">
+            <p>A simple way to connect and share your ideas with friends, colleagues, and the world.</p>
+        </div>
+
+        <!-- Login form (right) -->
+        <div class="login-box">
+            <form method="POST" action="/login">
+                {% if error %}
+                <div class="error">{{ error }}</div>
+                {% endif %}
+
+                <input type="text" name="username" placeholder="Email or Username" class="input-field" required>
+                <input type="password" name="password" placeholder="Password" class="input-field" required>
+
+                <button type="submit" class="login-btn">Log In</button>
+
+                <a href="#" class="link">Forgotten password?</a>
+
+                <div class="divider"></div>
+
+                <a href="/create-first-admin" class="create-account">Create New Account</a>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
