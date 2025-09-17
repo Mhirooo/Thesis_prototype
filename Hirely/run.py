@@ -9,21 +9,26 @@ from flask import render_template
 
 @app.route('/')
 def index():
-    return render_template('login.html')
+    # Default page → login
+    return render_template('index.html')
 
-@app.route('/create-first-admin')
-def create_first_admin_page():
-    return render_template('create_first_admin.html')
+@app.route('/register')
+def register_page():
+    return render_template('register.html')  # Make sure this file exists in /templates
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # TODO: Validate against database here
-        # For now, just redirect to /apply
+        # For now just print to console and redirect
+        print(f"User tried to login: {username} | {password}")
         return redirect('/apply')
     return render_template('login.html')
+
+@app.route('/apply')
+def apply_page():
+    return "<h1>Welcome! You are logged in.</h1>"
 
 
 if __name__ == '__main__':

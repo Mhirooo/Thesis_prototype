@@ -21,6 +21,11 @@ def create_app():
     # Load configuration from the Config class
     from instance.config import Config
     app.config.from_object(Config)
+
+    # ✅ Add upload folder config
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), '..', 'uploads')
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
     
     # Initialize extensions
     db.init_app(app)
