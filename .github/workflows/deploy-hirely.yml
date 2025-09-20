@@ -1,0 +1,22 @@
+name: Deploy Hirely to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main   # change this if your default branch is 'master'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Hirely folder
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages   # branch GitHub Pages will serve from
+          folder: Hirely     # only publish the Hirely folder

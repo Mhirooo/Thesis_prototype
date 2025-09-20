@@ -4,6 +4,11 @@ import sqlite3
 from sqlalchemy import text
 from flask import render_template, request, session, redirect
 from app import create_app, db  # Import your factory + db
+<<<<<<< HEAD
+=======
+import logging
+import warnings
+>>>>>>> main
 
 # Ensure parent dir is importable
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -11,7 +16,24 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 # Disable oneDNN optimizations for TF
+<<<<<<< HEAD
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+=======
+import importlib.util
+# Only set TensorFlow-related environment variables if TensorFlow is present
+if importlib.util.find_spec('tensorflow') is not None:
+    # Disable oneDNN optimizations for TF (optional safety)
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+    # Reduce TensorFlow logging of INFO/WARNING messages (optional)
+    # 0 = all logs, 1 = filter INFO, 2 = filter WARNING, 3 = filter ERROR
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+    # Also set Python logging to suppress TF/absl warnings originating from
+    # Python logging (these suppress the 'WARNING:tensorflow:From ...' lines).
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+    logging.getLogger('absl').setLevel(logging.ERROR)
+    # Silence DeprecationWarning coming from TensorFlow modules
+    warnings.filterwarnings('ignore', category=DeprecationWarning, module='tensorflow')
+>>>>>>> main
 
 # Create Flask app instance
 app = create_app()
@@ -151,7 +173,11 @@ def apply_page():
 # -------------------------------
 # Main entry
 # -------------------------------
+<<<<<<< HEAD
 if __name__ == '_main_':
+=======
+if __name__ == '__main__':
+>>>>>>> main
     with app.app_context():
         print("\n=== Registered Routes ===")
         for rule in app.url_map.iter_rules():
@@ -168,4 +194,8 @@ if __name__ == '_main_':
         pass
 
     # Start server
+<<<<<<< HEAD
     app.run(debug=True, host='0.0.0.0', port=5000)
+=======
+    app.run(debug=True, host='0.0.0.0', port=5000)
+>>>>>>> main

@@ -56,7 +56,11 @@ def create_app():
                 patched = False
                 # Try several known locations for telemetry/capture
                 # Try to locate Posthog or other telemetry implementations and
+<<<<<<< HEAD
                 # replace their capture implementations with permissive no-ops.
+=======
+                # replace their `capture` implementations with permissive no-ops.
+>>>>>>> main
                 try:
                     import importlib
                     # Verbose flag (set CHROMA_VERBOSE=1 to enable telemetry debug prints)
