@@ -4,6 +4,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 
 
+from app import db
+from werkzeug.security import generate_password_hash, check_password_hash
+
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -43,12 +46,9 @@ class User(db.Model):
         """Check if provided password matches hash"""
         return check_password_hash(self.password_hash, password)
 
-    @property
-    def full_name(self):
-        """Return full name in 'Last, First Middle' format."""
-        middle = f" {self.middle_name}" if self.middle_name else ""
-        return f"{self.last_name}, {self.first_name}{middle}"
-
+    # ----------------------------
+    # Serialization helper
+    # ----------------------------
     def to_dict(self):
         """Convert user object to dictionary for API responses"""
         return {

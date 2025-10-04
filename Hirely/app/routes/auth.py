@@ -227,11 +227,15 @@ def api_login():
             return jsonify({'error': 'No data provided'}), 400
             
         email = data.get('email')
+        email = data.get('email')
         password = data.get('password')
         
         if not all([email, password]):
             return jsonify({'error': 'Missing email or password'}), 400
+        if not all([email, password]):
+            return jsonify({'error': 'Missing email or password'}), 400
         
+        user = User.query.filter_by(email=email).first()
         user = User.query.filter_by(email=email).first()
         
         if user and user.check_password(password):
@@ -239,7 +243,8 @@ def api_login():
             session['role'] = 'admin' if user.is_admin else 'user'
             return jsonify({
                 'message': 'Login successful',
-                'user': user.to_dict()
+                'user': user.to_dict(),
+                'is_admin': user.is_admin  # 👈 include admin status
             }), 200
             
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -263,3 +268,14 @@ def check_auth():
             return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
     
     return jsonify({'authenticated': False}), 200
+
+
+@auth_bp.route('/admins', methods=['GET'])
+def list_admins():
+    admins = User.query.filter_by(is_admin=True).all()
+    return jsonify([{
+        'id': admin.id,
+        'email': admin.email,
+        'first_name': admin.first_name,
+        'last_name': admin.last_name
+    } for admin in admins]), 200
