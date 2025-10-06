@@ -108,6 +108,30 @@
       padding-bottom: 10px;
     }
 
+    .flash-messages {
+      margin-bottom: 20px;
+      grid-column: span 2;
+    }
+
+    .flash-message {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .flash-success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .flash-error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
     .form-group {
       margin-bottom: 20px;
     }
@@ -337,6 +361,17 @@
     </div>
 
     <div class="content-grid">
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
       <!-- Edit Job Form -->
       <div class="card">
         <h2>Job Details</h2>

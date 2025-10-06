@@ -1,8 +1,9 @@
 """
 Main routes for HTML pages with AI matching integration
 """
-from flask import Blueprint, render_template, request, session, redirect, flash, jsonify, send_file, current_app
+from flask import Blueprint, render_template, request, session, redirect, flash, jsonify, send_file, current_app, make_response
 from app.models import Job, User, Application, db
+from app.utils.security import secure_route, session_security_check, log_security_event
 import os
 
 try:
@@ -48,6 +49,7 @@ def admin_register_page():
 
 
 @main_bp.route('/user_dashboard')
+@secure_route
 def user_dashboard():
     """User dashboard with AI job recommendations"""
     user_id = session.get('user_id')
@@ -121,6 +123,7 @@ def user_dashboard():
 
 
 @main_bp.route('/admin_dashboard')
+@secure_route
 def admin_dashboard():
     """Admin dashboard"""
     user_id = session.get('user_id')
@@ -140,12 +143,14 @@ def admin_dashboard():
         flash('User account not found. Please log in again.', 'error')
         return redirect('/login')
     
-    jobs = Job.query.filter_by(is_active=True).all()
+    # Get only jobs created by this admin
+    jobs = Job.query.filter_by(created_by=user_id, is_active=True).all()
     
     return render_template('dashboard_admin.html', user=user, jobs=jobs)
 
 
 @main_bp.route('/post_job', methods=['GET', 'POST'])
+@secure_route
 def post_job():
     """Post new job"""
     user_id = session.get('user_id')
@@ -173,7 +178,8 @@ def post_job():
         new_job = Job(
             role=role,
             description=description,
-            is_active=True
+            is_active=True,
+            created_by=user_id  # Associate with current admin
         )
         
         db.session.add(new_job)
@@ -198,6 +204,7 @@ def post_job():
 
 
 @main_bp.route('/edit_job/<int:job_id>', methods=['GET', 'POST'])
+@secure_route
 def edit_job(job_id):
     """Edit job and view ranked applicants"""
     user_id = session.get('user_id')
@@ -208,6 +215,11 @@ def edit_job(job_id):
         return redirect('/login')
     
     job = Job.query.get_or_404(job_id)
+    
+    # Check if current admin owns this job
+    if job.created_by != user_id:
+        flash('Access denied. You can only edit jobs you created.', 'error')
+        return redirect('/admin_dashboard')
     
     if request.method == 'GET':
         applications = Application.query.filter_by(job_id=job_id).all()
@@ -269,6 +281,7 @@ def edit_job(job_id):
 
 
 @main_bp.route('/delete_job/<int:job_id>', methods=['POST'])
+@secure_route
 def delete_job(job_id):
     """Delete job"""
     user_id = session.get('user_id')
@@ -279,6 +292,11 @@ def delete_job(job_id):
         return redirect('/login')
     
     job = Job.query.get_or_404(job_id)
+    
+    # Check if current admin owns this job
+    if job.created_by != user_id:
+        flash('Access denied. You can only delete jobs you created.', 'error')
+        return redirect('/admin_dashboard')
     
     try:
         Application.query.filter_by(job_id=job_id).delete()
@@ -296,6 +314,7 @@ def delete_job(job_id):
 
 
 @main_bp.route('/view_resume/<int:user_id>')
+@secure_route
 def view_resume(user_id):
     """View resume"""
     admin_id = session.get('user_id')
@@ -306,6 +325,16 @@ def view_resume(user_id):
         return redirect('/login')
     
     user = User.query.get_or_404(user_id)
+    
+    # Check if this user has applied to any jobs created by the current admin
+    user_applications = Application.query.filter_by(user_id=user_id).all()
+    admin_job_ids = [job.id for job in Job.query.filter_by(created_by=admin_id).all()]
+    
+    has_access = any(app.job_id in admin_job_ids for app in user_applications)
+    
+    if not has_access:
+        flash('Access denied. You can only view resumes of applicants to your own jobs.', 'error')
+        return redirect('/admin_dashboard')
     
     if not user.resume:
         flash('No resume available for this user.', 'error')
@@ -328,13 +357,41 @@ def view_resume(user_id):
 
 @main_bp.route('/logout')
 def logout():
-    """Logout"""
+    """Enhanced logout with security measures"""
+    
+    # Get user info for logging before clearing session
+    user_id = session.get('user_id')
+    is_admin = session.get('is_admin')
+    user_type = "Admin" if is_admin else "User"
+    
+    # Clear all session data
     session.clear()
+    
+    # Force session to be deleted on client
+    session.permanent = False
+    
+    # Log the logout event for security audit
+    if user_id:
+        print(f"SECURITY LOG: {user_type} ID {user_id} logged out successfully (via blueprint)")
+    
     flash('You have been logged out successfully.', 'success')
-    return redirect('/')
+    
+    # Create response with security headers
+    response = make_response(redirect('/'))
+    
+    # Add security headers to prevent caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, private'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    # Clear any authentication cookies
+    response.set_cookie('session', '', expires=0, secure=True, httponly=True, samesite='Strict')
+    
+    return response
 
 
 @main_bp.route('/apply/<int:job_id>', methods=['POST'])
+@secure_route
 def apply_to_job(job_id):
     """Apply to job"""
     user_id = session.get('user_id')

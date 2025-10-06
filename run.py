@@ -4,6 +4,7 @@ import sqlite3
 from sqlalchemy import text
 from flask import render_template, request, session, redirect, flash, url_for, make_response, send_file
 from app import create_app, db
+from app.utils.security import secure_route, session_security_check, log_security_event, check_session_timeout, invalidate_session
 
 # Ensure parent dir is importable
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -201,6 +202,7 @@ def login():
 
 
 @app.route('/user_dashboard')
+@secure_route
 def user_dashboard():
     print("DEBUG: User dashboard route accessed")
     print(f"DEBUG: Session data: {dict(session)}")
@@ -301,6 +303,7 @@ def user_dashboard():
 
 
 @app.route('/admin_dashboard')
+@secure_route
 def admin_dashboard():
     print("DEBUG: Admin dashboard route accessed")
     
@@ -322,8 +325,8 @@ def admin_dashboard():
         flash('User account not found. Please log in again.', 'error')
         return redirect('/login')
     
-    # Get all jobs
-    jobs = Job.query.filter_by(is_active=True).all()
+    # Get only jobs created by this admin
+    jobs = Job.query.filter_by(created_by=user_id, is_active=True).all()
     
     response = make_response(
         render_template('dashboard_admin.html', user=user, jobs=jobs)
@@ -363,7 +366,8 @@ def post_job():
         new_job = Job(
             role=role,
             description=description,
-            is_active=True
+            is_active=True,
+            created_by=user_id  # Associate with current admin
         )
         
         db.session.add(new_job)
@@ -389,6 +393,7 @@ def post_job():
 
 
 @app.route('/edit_job/<int:job_id>', methods=['GET', 'POST'])
+@secure_route
 def edit_job(job_id):
     user_id = session.get('user_id')
     is_admin = session.get('is_admin')
@@ -398,6 +403,11 @@ def edit_job(job_id):
         return redirect('/login')
     
     job = Job.query.get_or_404(job_id)
+    
+    # Check if current admin owns this job
+    if job.created_by != user_id:
+        flash('Access denied. You can only edit jobs you created.', 'error')
+        return redirect('/admin_dashboard')
     
     if request.method == 'GET':
         # Get all applications for this job
@@ -471,6 +481,7 @@ def edit_job(job_id):
 
 
 @app.route('/delete_job/<int:job_id>', methods=['POST'])
+@secure_route
 def delete_job(job_id):
     user_id = session.get('user_id')
     is_admin = session.get('is_admin')
@@ -480,6 +491,11 @@ def delete_job(job_id):
         return redirect('/login')
     
     job = Job.query.get_or_404(job_id)
+    
+    # Check if current admin owns this job
+    if job.created_by != user_id:
+        flash('Access denied. You can only delete jobs you created.', 'error')
+        return redirect('/admin_dashboard')
     
     try:
         # Delete associated applications first
@@ -510,6 +526,16 @@ def view_resume(user_id):
     
     user = User.query.get_or_404(user_id)
     
+    # Check if this user has applied to any jobs created by the current admin
+    user_applications = Application.query.filter_by(user_id=user_id).all()
+    admin_job_ids = [job.id for job in Job.query.filter_by(created_by=admin_id).all()]
+    
+    has_access = any(app.job_id in admin_job_ids for app in user_applications)
+    
+    if not has_access:
+        flash('Access denied. You can only view resumes of applicants to your own jobs.', 'error')
+        return redirect('/admin_dashboard')
+    
     if not user.resume:
         flash('No resume available for this user.', 'error')
         return redirect('/admin_dashboard')
@@ -533,9 +559,36 @@ def view_resume(user_id):
 @app.route('/logout')
 def logout():
     print("DEBUG: Logout route accessed")
+    
+    # Get user info for logging before clearing session
+    user_id = session.get('user_id')
+    is_admin = session.get('is_admin')
+    user_type = "Admin" if is_admin else "User"
+    
+    # Clear all session data
     session.clear()
+    
+    # Force session to be deleted on client
+    session.permanent = False
+    
+    # Log the logout event for security audit
+    if user_id:
+        print(f"SECURITY LOG: {user_type} ID {user_id} logged out successfully")
+    
     flash('You have been logged out successfully.', 'success')
-    return redirect(url_for('index'))
+    
+    # Create response with security headers
+    response = make_response(redirect(url_for('index')))
+    
+    # Add security headers to prevent caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, private'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    # Clear any authentication cookies
+    response.set_cookie('session', '', expires=0, secure=True, httponly=True, samesite='Strict')
+    
+    return response
 
 
 @app.route('/api/job_matches', methods=['GET'])
