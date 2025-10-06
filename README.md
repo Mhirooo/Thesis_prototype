@@ -1,6 +1,24 @@
-# Hirely - AI-Powered Job Matching System
+# Thesis Prototype - Hirely Project
 
-Hirely is an intelligent job matching system that uses natural language processing and machine learning to match job seekers with relevant job opportunities. The system analyzes resumes and job descriptions to provide accurate matches based on skills, experience, and requirements.
+This repository contains the Hirely AI-powered recruitment platform.
+
+## 📁 Project Location
+
+The main application is located in the **`Hirely/`** directory.
+
+**👉 [View Complete Documentation](Hirely/README.md)**
+
+## Quick Access
+
+- **Main Application**: [`Hirely/`](Hirely/)
+- **Run Application**: `cd Hirely && python run.py`
+- **Documentation**: [`Hirely/README.md`](Hirely/README.md)
+- **Tests**: [`Hirely/tests/`](Hirely/tests/)
+- **Scripts**: [`Hirely/scripts/`](Hirely/scripts/)
+
+---
+
+**Note**: All development should be done within the `Hirely/` directory. The complete setup instructions, API documentation, and project details are available in the main README file inside the Hirely folder.
 
 ## Table of Contents
 - [System Overview](#system-overview)
@@ -174,6 +192,28 @@ The system uses two databases:
 - **Admins**: Can create, edit, and delete only their own job postings
 - **System Admin**: Can manage multiple admin accounts (optional)
 
+### Session Security
+- **Session Timeout**: Automatic logout after 30 minutes of inactivity
+- **Security Monitoring**: All security events are logged for audit purposes
+- **Enhanced Logout**: Comprehensive session clearing with security headers
+- **Request Protection**: Session validation on all protected routes
+- **Secure Cookies**: HTTPOnly and Secure cookie settings for production
+- **Browser Cache Prevention**: No-cache headers prevent back-button access after logout
+
+### Session Management Features
+- **Automatic Activity Tracking**: Last activity timestamp updated on each request
+- **Invalid Session Handling**: Graceful handling of corrupted or expired sessions
+- **Security Headers**: Cache-Control, Pragma, and Expires headers on logout
+- **Audit Logging**: Security events logged with timestamps and user information
+- **Cache Prevention**: Comprehensive cache control on all protected routes
+- **Anti-Clickjacking**: X-Frame-Options and XSS protection headers
+
+### Browser Security Features
+- **Back-Button Protection**: Users cannot access protected content via browser back button after logout
+- **Cache Control Headers**: `no-cache, no-store, must-revalidate, private` on all protected routes
+- **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+- **Page Expiration**: Browser forced to reload protected pages from server
+
 ## Health Checks
 
 The system includes built-in health checks for both databases:
@@ -201,6 +241,9 @@ python test_multi_admin.py
 
 # Create test jobs for different admins
 python create_test_jobs.py
+
+# Test session security features
+python test_session_security.py
 ```
 
 Expected behavior:
@@ -208,6 +251,31 @@ Expected behavior:
 - Cross-admin access to jobs is blocked
 - Resume access limited to relevant applicants
 - Edit/delete operations verify ownership
+- Session timeout after 30 minutes of inactivity
+- Secure logout with proper session clearing
+- Security events logged for audit purposes
+- Browser back-button blocked after logout
+
+## Security Testing
+
+The system includes comprehensive security tests:
+
+```bash
+# Test session timeout and security features
+python test_session_security.py
+
+# Test browser cache prevention and back-button protection
+python test_cache_prevention.py
+```
+
+Features tested:
+- Session timeout validation
+- Browser cache prevention headers
+- Back-button protection after logout
+- Security audit logging
+- Session invalidation
+- Protected route access
+- Enhanced logout functionality
 
 ## Contributing
 
