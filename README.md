@@ -22,11 +22,14 @@ Hirely uses a hybrid approach for job matching:
 ## Key Features
 
 - **Smart Job Matching**: AI-powered matching between resumes and job postings
-- **Dual User Roles**: Separate interfaces for job seekers and employers
+- **Multi-Admin System**: Independent admin accounts with isolated job management
+- **Dual User Roles**: Separate interfaces for job seekers and employers/admins
+- **Admin Isolation**: Each admin can only manage their own job postings
 - **Resume Processing**: Automatic extraction and analysis of resume content
 - **Real-time Matching**: Instant job recommendations based on resume content
 - **Shortlisting**: Automated candidate shortlisting for employers
 - **Match Explanations**: Transparent explanations of match scores
+- **Secure Access Control**: Role-based permissions and ownership verification
 
 ## Technology Stack
 
@@ -81,20 +84,35 @@ Hirely/
    python run.py
    ```
 
+5. **Database Migration** (if upgrading from older version):
+   ```bash
+   python migrate_add_created_by.py  # Adds admin ownership to existing jobs
+   ```
+
+6. **Create Admin Accounts**:
+   - Navigate to `/admin_register` to create admin accounts
+   - Each admin will have an isolated workspace for job management
+
 ## Database Architecture
 
 The system uses two databases:
 
 1. **SQLite Database** (`instance/resume_matcher.db`):
-   - User accounts and profiles
-   - Job listings
-   - Applications
+   - User accounts and profiles (job seekers and admins)
+   - Job listings with admin ownership tracking
+   - Applications and match data
    - System configurations
 
 2. **ChromaDB** (`chroma_storage/`):
    - Vector embeddings for resumes
    - Vector embeddings for job descriptions
    - Optimized for semantic search
+
+### Admin Isolation Features
+- Each job posting is linked to its creator admin via `created_by` foreign key
+- Admin dashboards show only jobs created by the current admin
+- Edit/delete operations verify ownership before allowing access
+- Resume viewing restricted to applicants of admin's own job postings
 
 ## Machine Learning Components
 
@@ -123,9 +141,15 @@ The system uses two databases:
 - `POST /auth/api/logout`: User logout
 
 ### Job Management
-- `GET /api/jobs/`: List all jobs
-- `POST /api/jobs/`: Create new job posting
-- `DELETE /api/jobs/<id>`: Delete job posting
+- `GET /api/jobs/`: List all active jobs (public view)
+- `POST /api/jobs/`: Create new job posting (admin only, auto-assigns to creator)
+- `DELETE /api/jobs/<id>`: Delete job posting (admin only, ownership verified)
+
+### Admin Features
+- `GET /admin_dashboard`: View admin's own job postings only
+- `GET /edit_job/<id>`: Edit job (ownership verified)
+- `POST /delete_job/<id>`: Delete job (ownership verified)
+- `GET /view_resume/<user_id>`: View resumes (restricted to own job applicants)
 
 ### Applications
 - `POST /api/applications/`: Submit job application
@@ -135,6 +159,20 @@ The system uses two databases:
 - `GET /api/matchmaking/`: Get job recommendations
 - `GET /api/matchmaking/explain/<id>`: Get match explanation
 - `GET /api/shortlist/<id>`: Get shortlisted candidates
+
+## Security & Access Control
+
+### Multi-Admin Architecture
+- **Complete Isolation**: Each admin operates in their own workspace
+- **Ownership Verification**: All job operations verify admin ownership
+- **Secure Dashboards**: Admins see only their own job postings
+- **Protected Routes**: Edit/delete operations require ownership validation
+- **Resume Access Control**: Restricted to applicants of admin's own jobs
+
+### User Roles
+- **Job Seekers**: Can view all active jobs and apply to any position
+- **Admins**: Can create, edit, and delete only their own job postings
+- **System Admin**: Can manage multiple admin accounts (optional)
 
 ## Health Checks
 
@@ -152,6 +190,24 @@ ChromaDB collections:
 - Resumes: X documents
 - Jobs: Y documents
 ```
+
+## Testing Multi-Admin Functionality
+
+To verify the admin isolation system:
+
+```bash
+# Test admin isolation
+python test_multi_admin.py
+
+# Create test jobs for different admins
+python create_test_jobs.py
+```
+
+Expected behavior:
+- Each admin sees only their own job postings
+- Cross-admin access to jobs is blocked
+- Resume access limited to relevant applicants
+- Edit/delete operations verify ownership
 
 ## Contributing
 
