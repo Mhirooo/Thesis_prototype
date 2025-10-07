@@ -46,7 +46,9 @@ Hirely uses a hybrid approach for job matching:
 - **Resume Processing**: Automatic extraction and analysis of resume content
 - **Real-time Matching**: Instant job recommendations based on resume content
 - **Shortlisting**: Automated candidate shortlisting for employers
-- **Match Explanations**: Transparent explanations of match scores
+- **Enhanced Match Explanations**: Beautiful, user-friendly visual explanations with interactive elements
+- **Clickable Logo Navigation**: Smart routing system based on user authentication status
+- **Modern UI/UX**: Redesigned interface with improved visual appeal and user experience
 - **Secure Access Control**: Role-based permissions and ownership verification
 
 ## Technology Stack
@@ -145,10 +147,30 @@ The system uses two databases:
    - Model file: `data/kmeans_model.pkl`
 
 3. **Matching Algorithm**:
-   - Hybrid scoring system
-   - 70% weight on cosine similarity
-   - 30% weight on BM25 ranking
+   - **Hybrid scoring system**: Final Score = (Cosine Similarity × 70) + (BM25 Score × 30)
+   - **Normalized BM25 scoring**: Prevents negative scores through proper normalization
+   - **Enhanced explanations**: Visual breakdown with emoji-enhanced interface
+   - **Point-based system**: Clear 0-100 point scale for easy interpretation
    - Implementation in `matching_service.py`
+
+## User Interface & Experience
+
+### Enhanced Match Analysis Interface
+- **Visual Score Display**: Large, color-coded circular score indicators
+- **Emoji Integration**: Intuitive icons for quick understanding (🌟 excellent, 👍 good, 🧠 semantic, 🔍 keyword)
+- **Color-Coded Tiers**: Dynamic coloring based on match quality (green for excellent, blue for good, etc.)
+- **Card-Based Layout**: Modern, responsive design with gradient backgrounds
+- **Interactive Elements**: Expandable candidate cards with detailed explanations
+
+### Navigation Improvements
+- **Smart Logo Navigation**: Contextual routing based on user authentication status
+- **Consistent Branding**: Clickable Hirely logos throughout the application
+- **User-Friendly URLs**: Intuitive route structure for better user experience
+
+### Scoring Methodology
+- **Transparent Scoring**: Clear breakdown of semantic vs keyword contributions
+- **Professional Presentation**: Business-friendly explanations without technical jargon
+- **Actionable Insights**: Recommendation system with clear next steps
 
 ## API Documentation
 
