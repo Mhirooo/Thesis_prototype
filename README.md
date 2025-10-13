@@ -11,7 +11,7 @@ The main application is located in the **`Hirely/`** directory.
 ## Quick Access
 
 - **Main Application**: [`Hirely/`](Hirely/)
-- **Run Application**: `cd Hirely && python run.py`
+- **Run Application**: `cd Hirely && python main.py`
 - **Documentation**: [`Hirely/README.md`](Hirely/README.md)
 - **Tests**: [`Hirely/tests/`](Hirely/tests/)
 - **Scripts**: [`Hirely/scripts/`](Hirely/scripts/)
@@ -101,7 +101,7 @@ Hirely/
 
 4. **Run the Application**:
    ```bash
-   python run.py
+   python main.py
    ```
 
 5. **Database Migration** (if upgrading from older version):
@@ -241,7 +241,7 @@ The system uses two databases:
 The system includes built-in health checks for both databases:
 ```bash
 # Run the application to see database status
-python run.py
+python main.py
 ```
 
 Expected output:
