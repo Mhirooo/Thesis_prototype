@@ -1,0 +1,3 @@
+# Root requirements file for Render deployment
+# This references the actual requirements in the Hirely subdirectory
+-r Hirely/requirements.txt
