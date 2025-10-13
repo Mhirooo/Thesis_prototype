@@ -10,7 +10,8 @@ services:
       cd Hirely
       mkdir -p instance/uploads chroma_storage data
       python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()"
-    startCommand: "cd Hirely && gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 run:app"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 run:app"
+    rootDir: ./Hirely
     envVars:
       - key: FLASK_ENV
         value: production
