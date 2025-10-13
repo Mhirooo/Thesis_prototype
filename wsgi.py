@@ -20,11 +20,21 @@ os.chdir(hirely_path)
 print(f"WSGI: Changed to directory: {os.getcwd()}")
 print(f"WSGI: Files in directory: {os.listdir('.')}")
 
-# Now import the run module which will handle the app creation
+# Now import the main module which will handle the app creation
 try:
-    import run
-    app = run.app  # Get the app instance from run.py
-    print("WSGI: Successfully imported app from run.py")
+    import main
+    app = main.app  # Get the app instance from main.py
+    print("WSGI: Successfully imported app from main.py")
+except Exception as main_error:
+    print(f"WSGI: Failed to import main.py: {main_error}")
+    try:
+        # Fallback to simple app for testing
+        import simple_app
+        app = simple_app.create_app()
+        print("WSGI: Using simple_app as fallback")
+    except Exception as fallback_error:
+        print(f"WSGI: Fallback also failed: {fallback_error}")
+        raise main_error  # Raise the original error
         
 except Exception as e:
     print(f"WSGI Error: {e}")
