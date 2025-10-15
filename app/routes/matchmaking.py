@@ -16,21 +16,56 @@ def _get_snippet(text, term, radius=40):
     end = min(len(text), idx + len(term) + radius)
     return text[start:end].strip()
 
+def _generate_recommendation_reasoning(score, term_count):
+    """
+    Generate recommendation reasoning based on score and matching terms
+    (Same function as used in shortlisting for consistency)
+    """
+    if score > 80:
+        return f"Excellent match with high relevance score ({score:.1f}) and {term_count} matching key terms. Highly recommended for application."
+    elif score > 65:
+        return f"Strong candidate match with good relevance score ({score:.1f}) and {term_count} relevant qualifications. Recommended for application."
+    elif score > 50:
+        return f"Good match with moderate relevance score ({score:.1f}) and {term_count} matching terms. Consider applying."
+    elif score > 35:
+        return f"Moderate match with some relevant experience (score: {score:.1f}). Review job requirements carefully before applying."
+    else:
+        return f"Limited match with position requirements (score: {score:.1f}). Consider improving resume alignment or exploring other opportunities."
+
 @matchmaking_bp.route('/', methods=['GET'])
 @login_required
 def get_job_matches():
     try:
         user_id = session['user_id']
 
-        # Get user's most recent application
+        # Get resume text - try from application first, then from uploaded file
+        user_resume_text = None
+        
+        # First, try to get resume text from the user's most recent application
         latest_application = Application.query.filter_by(
             user_id=user_id
         ).order_by(Application.submission_date.desc()).first()
 
-        if not latest_application:
-            return jsonify({'error': 'No applications found for this user'}), 404
+        if latest_application and latest_application.resume_text:
+            user_resume_text = latest_application.resume_text
+        else:
+            # Try to get resume text from uploaded file
+            from app.models import User
+            from app.utils.resume_extractor import extract_resume_text
+            import os
+            
+            user = User.query.get(user_id)
+            if user and user.resume:
+                upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+                resume_path = os.path.join(upload_folder, user.resume)
+                if os.path.exists(resume_path):
+                    try:
+                        user_resume_text = extract_resume_text(resume_path, preprocess=True)
+                    except Exception as e:
+                        print(f"Failed to extract resume text: {e}")
 
-        user_resume_text = latest_application.resume_text or ""
+        if not user_resume_text or len(user_resume_text.strip()) == 0:
+            return jsonify({'error': 'No resume text available. Please upload a resume or apply to a job first.'}), 404
 
         # Get all active jobs
         jobs = Job.query.filter_by(is_active=True).all()
@@ -53,7 +88,7 @@ def get_job_matches():
             results.append({
                 'job_id': job.id,
                 'role': job.role,
-                'score': float(score),
+                'score': round(float(score), 1),
                 'description_preview': (
                     job.description[:100] + '...'
                     if len(job.description) > 100
@@ -71,36 +106,85 @@ def get_job_matches():
 @login_required
 def explain_matchmaking(job_id):
     try:
+        print(f"DEBUG: Explaining matchmaking for job_id: {job_id}")
         user_id = session['user_id']
+        print(f"DEBUG: User ID: {user_id}")
 
-        # Get user's most recent application
+        # Get resume text - try from application first, then from uploaded file
+        user_resume_text = None
+        
+        # First, try to get resume text from the user's most recent application
         latest_application = Application.query.filter_by(
             user_id=user_id
         ).order_by(Application.submission_date.desc()).first()
 
-        if not latest_application:
-            return jsonify({'error': 'No applications found for this user'}), 404
+        if latest_application and latest_application.resume_text:
+            user_resume_text = latest_application.resume_text
+            print(f"DEBUG: Resume text from application: {len(user_resume_text)} chars")
+        else:
+            print(f"DEBUG: No applications found for user {user_id}, trying uploaded resume")
+            
+            # Try to get resume text from uploaded file
+            from app.models import User
+            from app.utils.resume_extractor import extract_resume_text
+            import os
+            
+            user = User.query.get(user_id)
+            if user and user.resume:
+                print(f"DEBUG: Trying to extract from uploaded resume: {user.resume}")
+                upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+                resume_path = os.path.join(upload_folder, user.resume)
+                if os.path.exists(resume_path):
+                    try:
+                        user_resume_text = extract_resume_text(resume_path, preprocess=True)
+                        print(f"DEBUG: Extracted resume text: {len(user_resume_text)} chars")
+                    except Exception as e:
+                        print(f"DEBUG: Failed to extract resume text: {e}")
 
-        user_resume_text = latest_application.resume_text or ""
+        if not user_resume_text or len(user_resume_text.strip()) == 0:
+            print(f"DEBUG: No resume text available for user {user_id}")
+            return jsonify({'error': 'No resume text available. Please upload a resume or apply to a job first.'}), 404
 
         # Get the job
         job = Job.query.get_or_404(job_id)
+        print(f"DEBUG: Found job: {job.role}")
         
-        # Use matching service for improved hybrid scoring
+        # Use matching service for consistent scoring with main route
         from matching_service import get_matching_service
         ms = get_matching_service(current_app.config.get('CHROMA_PATH', 'chroma_storage'))
         
-        # Get similarity scores using both cosine and BM25
+        print(f"DEBUG: Using matching service for consistent scoring")
+        
+        # Use the EXACT same method as the main route (get_job_matches)
+        # This ensures the explanation score matches the displayed score in job cards
+        top_matches = ms.get_top_jobs_for_resume(user_resume_text, [job], top_n=1)
+        
+        if top_matches:
+            job_id_match, main_route_score = top_matches[0]
+            print(f"DEBUG: Main route score (matches job card display): {main_route_score:.1f}")
+            final_score = main_route_score
+        else:
+            print("WARNING: No matches returned from matching service")
+            final_score = 0
+        
+        # Get individual component scores for detailed breakdown
         job_desc = f"{job.role} {job.description}"
-        cosine_score = ms._get_cosine_similarity_scores(user_resume_text, [job_desc])[0]
-        bm25_score = ms._get_bm25_scores(user_resume_text, [job_desc])[0]
+        cosine_scores = ms._get_cosine_similarity_scores(user_resume_text, [job_desc])
+        bm25_scores = ms._get_bm25_scores(user_resume_text, [job_desc])
         
-        # Normalize scores
-        cosine_norm = ms._normalize_scores([cosine_score])[0]
-        bm25_norm = ms._normalize_scores([bm25_score])[0]
+        cosine_score = cosine_scores[0] if cosine_scores else 0
+        bm25_raw_score = bm25_scores[0] if bm25_scores else 0
+        bm25_normalized = ms._normalize_scores([bm25_raw_score])[0] if bm25_scores else 0
         
-        # Calculate final hybrid score (70% cosine + 30% BM25)
-        final_score = (0.7 * cosine_norm + 0.3 * bm25_norm) * 100
+        cosine_points = cosine_score * 70
+        bm25_points = bm25_normalized * 30
+        calculated_total = cosine_points + bm25_points
+        
+        print(f"DEBUG: Component scores:")
+        print(f"  - Cosine: {cosine_score:.4f} -> {cosine_points:.1f} points")
+        print(f"  - BM25: {bm25_raw_score:.4f} -> {bm25_normalized:.3f} -> {bm25_points:.1f} points")
+        print(f"  - Calculated total: {calculated_total:.1f}")
+        print(f"  - Main route score: {main_route_score:.1f} (should match)")
 
         # Get key terms from both documents
         resume_terms = set(user_resume_text.lower().split())
@@ -136,14 +220,29 @@ def explain_matchmaking(job_id):
         matching_token_count = len(matching_terms)
         coverage = matching_token_count / max(1, resume_token_count)
         
-        # Generate summary insights
-        level = "Strong" if final_score > 75 else "Good" if final_score > 50 else "Moderate" if final_score > 25 else "Limited"
+        # Generate summary insights using the same scoring as shortlisting
+        if final_score > 80:
+            level = "Excellent"
+            recommendation = "Highly recommended - strong alignment with job requirements"
+        elif final_score > 65:
+            level = "Strong"
+            recommendation = "Recommended - good match with solid relevant experience"
+        elif final_score > 50:
+            level = "Good"
+            recommendation = "Consider applying - moderate match with relevant qualifications"
+        elif final_score > 35:
+            level = "Moderate"
+            recommendation = "Review carefully - limited match, requires detailed evaluation"
+        else:
+            level = "Limited"
+            recommendation = "Low match - minimal alignment with job requirements"
+            
         insights = [
-            f"{level} match with an overall score of {final_score:.1f}%",
+            f"{level} match with an overall score of {final_score:.1f} points",
+            f"Semantic similarity contributes {cosine_points:.1f} points (content understanding)",
+            f"Keyword matching contributes {bm25_points:.1f} points (specific terms)",
             f"Found {matching_token_count} matching terms between your resume and the job description",
-            f"Your resume covers {coverage*100:.1f}% of the key terms in the job posting",
-            f"Semantic similarity score: {cosine_norm*100:.1f}%",
-            f"Keyword matching score: {bm25_norm*100:.1f}%"
+            f"Your resume covers {coverage*100:.1f}% of the key terms in the job posting"
         ]
 
         return jsonify({
@@ -151,8 +250,13 @@ def explain_matchmaking(job_id):
             'job_role': job.role,
             'scores': {
                 'overall': round(final_score, 1),
-                'semantic_similarity': round(cosine_norm * 100, 1),
-                'keyword_matching': round(bm25_norm * 100, 1)
+                'cosine_points': round(cosine_points, 1),
+                'bm25_points': round(bm25_points, 1),
+                'cosine_raw': round(cosine_score, 3),
+                'bm25_raw': round(bm25_raw_score, 3),
+                'bm25_normalized': round(bm25_normalized, 3),
+                'semantic_weight': 70,
+                'keyword_weight': 30
             },
             'matching_terms': formatted_terms[:10],  # Top 10 matching terms
             'coverage': {
@@ -161,7 +265,9 @@ def explain_matchmaking(job_id):
                 'percentage': round(coverage * 100, 1)
             },
             'insights': insights,
-            'recommendation': _generate_recommendation_reasoning(final_score/100, matching_token_count)
+            'recommendation': recommendation,
+            'recommendation_reasoning': _generate_recommendation_reasoning(final_score, matching_token_count),
+            'scoring_explanation': f"Score calculated using: (Cosine Similarity × 70) + (BM25 Score × 30) = ({cosine_score:.3f} × 70) + ({bm25_normalized:.3f} × 30) = {final_score:.1f} points"
         }), 200
 
     except Exception as e:

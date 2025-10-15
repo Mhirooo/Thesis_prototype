@@ -622,7 +622,7 @@ def get_job_matches():
         # Get all active jobs
         jobs = Job.query.filter_by(is_active=True).all()
         
-        # Get matching service and rank jobs
+        # Get matching service and rank jobs using automatic K-means classification
         matching_service = get_matching_service(app.config.get('CHROMA_PATH', 'chroma_storage'))
         job_rankings = matching_service.get_top_jobs_for_resume(
             resume_text, 
@@ -639,10 +639,14 @@ def get_job_matches():
                     'job_id': job.id,
                     'role': job.role,
                     'match_score': round(score, 2),
+                    'cluster_id': job.cluster_id,
                     'description_preview': job.description[:150] + '...' if len(job.description) > 150 else job.description
                 })
         
-        return {'success': True, 'matches': results}, 200
+        return {
+            'success': True, 
+            'matches': results
+        }, 200
         
     except Exception as e:
         print(f"ERROR: Failed to get job matches: {e}")
@@ -754,10 +758,16 @@ if __name__ == '__main__':
         pass
 
     print("\n=== Starting Flask App ===")
-    print("Access the application at: http://localhost:5000")
-    print("Login page: http://localhost:5000/login")
-    print("Register page: http://localhost:5000/register")
+    
+    # Get port from environment for production deployment
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    
+    print(f"Access the application at: http://localhost:{port}")
+    print(f"Login page: http://localhost:{port}/login")
+    print(f"Register page: http://localhost:{port}/register")
     print(f"Matching service: {'ENABLED' if MATCHING_ENABLED else 'DISABLED'}")
+    print(f"Debug mode: {'ON' if debug_mode else 'OFF'}")
     
     # Start server
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)

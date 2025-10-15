@@ -154,12 +154,19 @@
       padding: 14px 16px;
       margin-bottom: 12px;
       cursor: pointer;
-      transition: box-shadow 0.2s ease, transform 0.1s ease;
+      transition: box-shadow 0.2s ease, transform 0.1s ease, border-color 0.2s ease;
     }
     
     .job-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 8px rgba(46, 204, 176, 0.15);
       transform: translateY(-1px);
+      border-color: #2eccb0;
+    }
+    
+    .job-card.selected {
+      border-color: #2eccb0;
+      background: #f0fdf9;
+      box-shadow: 0 2px 8px rgba(46, 204, 176, 0.1);
     }
     
     .job-card h3 {
@@ -287,7 +294,9 @@
   <!-- Dashboard Header -->
   <header>
     <div class="logo">
-      <img src="/static/hirely_logo.png" alt="Hirely Logo">
+      <a href="/user_dashboard" style="text-decoration: none; color: inherit;">
+        <img src="{{ url_for('static', filename='Hirely_logo.png') }}" alt="Hirely Logo">
+      </a>
     </div>
     <nav>
       <div class="user-info">
@@ -300,7 +309,7 @@
           </div>
           <div class="dropdown-content">
             <a href="/profile">Profile</a>
-            <a href="/settings">Settings</a>
+            <!-- <a href="/settings">Settings</a> -->
             <a href="/logout">Logout</a>
           </div>
         </div>
@@ -314,6 +323,9 @@
       <!-- Jobs List -->
       <div class="jobs-list">
         <h2>Recommended Jobs for You</h2>
+        
+        <!-- Jobs container -->
+        <div id="jobsContainer">
         {% for job in jobs %}
         <div class="job-card"
              data-id="{{ job.id }}"
@@ -324,20 +336,36 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <h3 style="margin: 0;">{{ job.role }}</h3>
             {% if job.match_score and job.match_score > 0 %}
-            <span class="match-badge">{{ job.match_score|int }}% Match</span>
+            <span class="match-badge">{{ job.match_score|int }} Score</span>
             {% endif %}
           </div>
           <p>{{ job.description[:80] }}...</p>
         </div>
         {% endfor %}
-      </div>
+        </div> <!-- End jobsContainer -->
+      </div> <!-- End jobs-list -->
 
       <div class="divider"></div>
 
       <!-- Job Details -->
       <div class="job-details" id="jobDetails">
-        <h2>Select a Job</h2>
-        <p>Click on any job from the list to view full details and apply.</p>
+        <h2 style="display: flex; align-items: center; gap: 10px; color: #2c3e50;">
+          <span style="font-size: 24px;">🎯</span>
+          Welcome {{ user.first_name }}!
+        </h2>
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; text-align: center;">
+          <h3 style="color: #2c3e50; margin-bottom: 12px;">Your Personalized Job Recommendations</h3>
+          <p style="color: #666; margin-bottom: 15px; line-height: 1.5;">
+            Our AI has analyzed your profile and found the best matching opportunities. 
+            Click on any job from the list to see detailed information and your compatibility score.
+          </p>
+          <div style="background: #e8f5e8; padding: 15px; border-radius: 6px; margin-top: 15px;">
+            <p style="margin: 0; color: #2c3e50; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <span style="font-size: 16px;">💡</span>
+              <strong>Tip:</strong> Higher match scores indicate better alignment with your skills and experience
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -347,25 +375,278 @@
   </footer>
 
   <script>
+    // Function to load initial job recommendations
+    function loadInitialRecommendations() {
+      fetch('/api/job_matches')
+        .then(response => response.json())
+        .then(data => {
+          // Update the job display immediately
+          updateJobDisplay(data.matches);
+        })
+        .catch(error => {
+          console.error('Error fetching recommendations:', error);
+        });
+    }
+    // Simple helper function for job display
+    function updateJobDisplay(matches) {
+      const jobsContainer = document.getElementById('jobsContainer');
+      if (matches && matches.length > 0) {
+        jobsContainer.innerHTML = '';
+        matches.forEach(job => {
+          const jobCard = document.createElement('div');
+          jobCard.className = 'job-card';
+          jobCard.setAttribute('data-id', job.job_id);
+          jobCard.setAttribute('data-title', job.role);
+          jobCard.setAttribute('data-description', job.description_preview);
+          jobCard.setAttribute('data-match', job.match_score);
+          jobCard.onclick = () => showJobDetails(job.job_id, job.role, job.description_preview, job.match_score);
+          
+          jobCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <h3 style="margin: 0;">${job.role}</h3>
+              <span class="match-badge">${job.match_score.toFixed(1)} Score</span>
+            </div>
+            <p>${job.description_preview}...</p>
+          `;
+          
+          jobsContainer.appendChild(jobCard);
+        });
+      }
+    }
+
+    function parseJobDescription(description) {
+      // Function to extract and format different sections from job description
+      const sections = {
+        overview: '',
+        responsibilities: '',
+        requirements: '',
+        qualifications: ''
+      };
+      
+      // Split description by common section headers (case insensitive)
+      const lines = description.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      let currentSection = 'overview';
+      
+      for (let line of lines) {
+        const lowerLine = line.toLowerCase();
+        
+        // Check for section headers
+        if (lowerLine.includes('responsibilities') || lowerLine.includes('duties') || lowerLine.includes('role')) {
+          currentSection = 'responsibilities';
+          continue;
+        } else if (lowerLine.includes('requirements') || lowerLine.includes('must have') || lowerLine.includes('required')) {
+          currentSection = 'requirements';
+          continue;
+        } else if (lowerLine.includes('qualifications') || lowerLine.includes('preferred') || lowerLine.includes('nice to have')) {
+          currentSection = 'qualifications';
+          continue;
+        }
+        
+        // Add content to current section
+        if (line.length > 0) {
+          sections[currentSection] += (sections[currentSection] ? '\n' : '') + line;
+        }
+      }
+      
+      return sections;
+    }
+    
+    function formatSection(title, content, icon, bgColor) {
+      if (!content || content.trim().length === 0) return '';
+      
+      // Convert newlines to list items if content contains bullet points or multiple lines
+      let formattedContent = content;
+      if (content.includes('\n') || content.includes('•') || content.includes('-')) {
+        const items = content.split('\n').filter(item => item.trim().length > 0);
+        formattedContent = '<ul style="margin: 0; padding-left: 20px;">' + 
+          items.map(item => `<li style="margin-bottom: 5px;">${item.replace(/^[•\-\*]\s*/, '')}</li>`).join('') + 
+          '</ul>';
+      } else {
+        formattedContent = `<p style="margin: 0; line-height: 1.6;">${content}</p>`;
+      }
+      
+      return `
+        <div style="background: ${bgColor}; border-radius: 8px; padding: 18px; margin-bottom: 16px; border-left: 4px solid ${icon === '🎯' ? '#2eccb0' : icon === '📋' ? '#007bff' : '#ffc107'};">
+          <h4 style="margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">${icon}</span>
+            ${title}
+          </h4>
+          ${formattedContent}
+        </div>
+      `;
+    }
+
     function showJobDetails(jobId, title, description, matchScore) {
+      // Remove selected class from all job cards
+      document.querySelectorAll('.job-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      // Add selected class to clicked card
+      event.target.closest('.job-card').classList.add('selected');
+      
+      // Parse the job description into sections
+      const sections = parseJobDescription(description);
+      
       const details = document.getElementById("jobDetails");
       
       let matchScoreHTML = '';
       if (matchScore && matchScore > 0) {
         matchScoreHTML = `
-          <div class="match-score-display">
-            <div class="score">${matchScore}%</div>
-            <div class="label">Match Score</div>
+          <div class="match-score-display" style="background: linear-gradient(135deg, #2eccb0 0%, #27b89f 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(46, 204, 176, 0.2);">
+            <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <span style="font-size: 24px;">🎯</span>
+              ${matchScore.toFixed(1)} Score
+            </div>
+            <div style="font-size: 14px; opacity: 0.95; font-weight: 500;">AI Match Score</div>
+            <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">Based on semantic similarity (70%) + keyword matching (30%)</div>
+            <button onclick="showMatchExplanation(${jobId})" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 8px 16px; font-size: 12px; cursor: pointer; margin-top: 10px; transition: all 0.2s;">
+              📊 View Detailed Analysis
+            </button>
           </div>
         `;
       }
       
       details.innerHTML = `
         ${matchScoreHTML}
-        <h2>${title}</h2>
-        <p>${description}</p>
-        <button class="apply-btn" onclick="applyToJob(${jobId})">Apply Now</button>
+        <h2 style="color: #2c3e50; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid #e9ecef; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">💼</span>
+          ${title}
+        </h2>
+        
+        ${sections.overview ? `
+          <div style="background: #f8f9fa; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">📝</span>
+              Job Overview
+            </h4>
+            <p style="margin: 0; line-height: 1.6; color: #444;">${sections.overview}</p>
+          </div>
+        ` : ''}
+        
+        ${formatSection('Key Responsibilities', sections.responsibilities, '🎯', '#e8f5e8')}
+        ${formatSection('Requirements', sections.requirements, '📋', '#e3f2fd')}
+        ${formatSection('Preferred Qualifications', sections.qualifications, '⭐', '#fff3e0')}
+        
+        ${!sections.responsibilities && !sections.requirements && !sections.qualifications ? `
+          <div style="background: #f8f9fa; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">📝</span>
+              Job Description
+            </h4>
+            <p style="margin: 0; line-height: 1.6; color: #444;">${description}</p>
+          </div>
+        ` : ''}
+        
+        <div style="margin-top: 30px; padding: 24px; background: linear-gradient(135deg, #f0fdf9 0%, #ffffff 100%); border-radius: 10px; border: 1px solid #2eccb0; box-shadow: 0 2px 8px rgba(46, 204, 176, 0.1);">
+          <h4 style="margin: 0 0 12px 0; color: #2c3e50; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🚀</span>
+            Ready to Apply?
+          </h4>
+          <p style="margin: 0 0 18px 0; color: #666; font-size: 14px; line-height: 1.5;">
+            ${matchScore && matchScore > 0 ? 
+              `With a ${matchScore}% match score, this position aligns well with your profile. Apply now to take the next step in your career!` :
+              'This position offers great opportunities for professional growth. Apply now to take the next step in your career!'
+            }
+          </p>
+          <button class="apply-btn" onclick="applyToJob(${jobId})" style="background: #2eccb0; color: white; border: none; border-radius: 6px; padding: 14px 28px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(46, 204, 176, 0.2);">
+            <span style="margin-right: 8px;">📤</span>
+            Apply Now
+          </button>
+        </div>
       `;
+    }
+
+    function showMatchExplanation(jobId) {
+      // Show loading state
+      const explanationDiv = document.createElement('div');
+      explanationDiv.id = 'matchExplanation';
+      explanationDiv.style.cssText = 'margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #2eccb0;';
+      explanationDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><span style="font-size: 18px;">🔄</span> Analyzing match...</div>';
+      
+      const detailsDiv = document.getElementById('jobDetails');
+      const existingExplanation = document.getElementById('matchExplanation');
+      if (existingExplanation) {
+        existingExplanation.remove();
+      }
+      detailsDiv.appendChild(explanationDiv);
+      
+      // Fetch detailed explanation
+      fetch(`/api/matchmaking/explain/${jobId}`)
+        .then(response => {
+          console.log('Response status:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Received data:', data);
+          if (data.error) {
+            explanationDiv.innerHTML = `<div style="color: #dc3545; text-align: center;">❌ ${data.error}</div>`;
+            return;
+          }
+          
+          const scores = data.scores;
+          const insights = data.insights;
+          const recommendation = data.recommendation;
+          const recommendationReasoning = data.recommendation_reasoning;
+          const scoringExplanation = data.scoring_explanation;
+          const matchingTerms = data.matching_terms.slice(0, 5); // Top 5 terms
+          
+          explanationDiv.innerHTML = `
+            <h3 style="color: #2c3e50; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+              <span>📊</span> Detailed Match Analysis
+            </h3>
+            
+            <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+              <h4 style="color: #495057; margin-bottom: 10px;">Score Breakdown</h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                <div style="text-align: center; padding: 10px; background: #e3f2fd; border-radius: 6px;">
+                  <div style="font-size: 20px; font-weight: bold; color: #1976d2;">${scores.cosine_points}</div>
+                  <div style="font-size: 12px; color: #666;">Semantic Points (70%)</div>
+                </div>
+                <div style="text-align: center; padding: 10px; background: #f3e5f5; border-radius: 6px;">
+                  <div style="font-size: 20px; font-weight: bold; color: #7b1fa2;">${scores.bm25_points}</div>
+                  <div style="font-size: 12px; color: #666;">Keyword Points (30%)</div>
+                </div>
+              </div>
+              <div style="font-size: 12px; color: #666; text-align: center;">
+                ${scoringExplanation}
+              </div>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+              <h4 style="color: #495057; margin-bottom: 10px;">Key Matching Terms</h4>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${matchingTerms.map(term => `
+                  <span style="background: #e8f5e8; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                    ${term.term} (${term.resume_count}x)
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+              <h4 style="color: #495057; margin-bottom: 10px;">Insights</h4>
+              <ul style="margin: 0; padding-left: 20px;">
+                ${insights.map(insight => `<li style="margin-bottom: 5px; color: #555;">${insight}</li>`).join('')}
+              </ul>
+            </div>
+            
+            <div style="background: ${scores.overall > 65 ? '#d4edda' : scores.overall > 50 ? '#fff3cd' : '#f8d7da'}; 
+                        color: ${scores.overall > 65 ? '#155724' : scores.overall > 50 ? '#856404' : '#721c24'}; 
+                        padding: 15px; border-radius: 6px; border-left: 4px solid ${scores.overall > 65 ? '#28a745' : scores.overall > 50 ? '#ffc107' : '#dc3545'};">
+              <h4 style="margin-bottom: 10px;">Recommendation</h4>
+              <p style="margin-bottom: 5px; font-weight: 600;">${recommendation}</p>
+              <p style="margin: 0; font-size: 14px;">${recommendationReasoning}</p>
+            </div>
+          `;
+        })
+        .catch(error => {
+          console.error('Error fetching match explanation:', error);
+          explanationDiv.innerHTML = `<div style="color: #dc3545; text-align: center;">❌ Error loading detailed analysis: ${error.message}</div>`;
+        });
     }
 
     function applyToJob(jobId) {
@@ -378,13 +659,21 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          alert('Application submitted successfully!');
+          alert('🎉 Application submitted successfully!');
+          // Update button to show applied state
+          const applyBtn = document.querySelector('.apply-btn');
+          if (applyBtn) {
+            applyBtn.innerHTML = '<span style="margin-right: 8px;">✅</span>Applied';
+            applyBtn.style.background = '#28a745';
+            applyBtn.disabled = true;
+            applyBtn.style.cursor = 'not-allowed';
+          }
         } else {
-          alert('Error: ' + data.error);
+          alert('❌ Error: ' + data.error);
         }
       })
       .catch(error => {
-        alert('An error occurred. Please try again.');
+        alert('⚠️ An error occurred. Please try again.');
         console.error('Error:', error);
       });
     }
@@ -401,6 +690,17 @@
     document.addEventListener("click", (event) => {
       if (!dropdown.contains(event.target) && event.target !== avatarBtn) {
         dropdown.classList.remove("active");
+      }
+    });
+
+    // Auto-select first job if available and load recommendations
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load job recommendations automatically
+      loadInitialRecommendations();
+      
+      const firstJob = document.querySelector('.job-card');
+      if (firstJob) {
+        firstJob.click();
       }
     });
   </script>

@@ -202,7 +202,9 @@
 
   <header>
     <div class="logo">
-      <img src="/static/hirely_logo.png" alt="Hirely Logo">
+      <a href="/admin_dashboard" style="text-decoration: none; color: inherit;">
+        <img src="{{ url_for('static', filename='Hirely_logo.png') }}" alt="Hirely Logo">
+      </a>
     </div>
     <nav>
       <a href="/admin_dashboard">Dashboard</a>
@@ -224,7 +226,7 @@
         <ul>
           <li><a href="/post_job">➕ Post a Job</a></li>
           <li><a href="/admin_dashboard">📋 Jobs Posted</a></li>
-          <li><a href="/reports">📊 Reports</a></li>
+          <!-- <li><a href="/reports">📊 Reports</a></li> -->
         </ul>
       </div>
     </div>

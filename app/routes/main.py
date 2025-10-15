@@ -131,21 +131,56 @@ def user_dashboard():
     
     jobs = Job.query.filter_by(is_active=True).all()
     
-    if user.resume and MATCHING_ENABLED and RESUME_EXTRACTION_ENABLED:
+    print(f"DEBUG: MATCHING_ENABLED: {MATCHING_ENABLED}")
+    
+    # Initialize all jobs with 0 score first (fallback)
+    for job in jobs:
+        job.match_score = 0
+    
+    if MATCHING_ENABLED:
         try:
-            upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
-            resume_path = os.path.join(upload_folder, user.resume)
+            resume_text = None
             
-            if os.path.exists(resume_path):
-                resume_text = extract_resume_text(resume_path)
-                
-                if resume_text:
+            # First, try to get resume text from the user's most recent application
+            latest_application = Application.query.filter_by(
+                user_id=user_id
+            ).order_by(Application.submission_date.desc()).first()
+            
+            print(f"DEBUG: Latest application found: {latest_application is not None}")
+            
+            if latest_application and latest_application.resume_text:
+                resume_text = latest_application.resume_text
+                print(f"DEBUG: Resume text from application: {len(resume_text)} chars")
+            
+            # If no application resume text, try to extract from uploaded resume file
+            elif user.resume and RESUME_EXTRACTION_ENABLED:
+                print(f"DEBUG: Trying to extract from uploaded resume: {user.resume}")
+                upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+                resume_path = os.path.join(upload_folder, user.resume)
+                if os.path.exists(resume_path):
+                    try:
+                        resume_text = extract_resume_text(resume_path, preprocess=True)
+                        print(f"DEBUG: Extracted resume text: {len(resume_text)} chars")
+                    except Exception as e:
+                        print(f"DEBUG: Failed to extract resume text: {e}")
+            
+            if resume_text and len(resume_text.strip()) > 0:
+                try:
+                    print("DEBUG: Starting matching service calculation...")
                     matching_service = get_matching_service(current_app.config.get('CHROMA_PATH', 'chroma_storage'))
+                    
+                    if matching_service is None:
+                        print("DEBUG: Matching service is None - skipping AI matching")
+                        raise Exception("Matching service unavailable")
+                    
+                    print(f"DEBUG: Calculating rankings for {len(jobs)} jobs...")
                     job_rankings = matching_service.get_top_jobs_for_resume(
                         resume_text, 
                         jobs,
                         top_n=len(jobs)
                     )
+                    
+                    print(f"DEBUG: Job rankings: {job_rankings[:3]}")  # Show first 3 rankings
                     
                     score_dict = {job_id: score for job_id, score in job_rankings}
                     for job in jobs:
@@ -153,10 +188,16 @@ def user_dashboard():
                     
                     jobs.sort(key=lambda x: x.match_score, reverse=True)
                     print(f"DEBUG: Calculated match scores for {len(jobs)} jobs")
-                else:
+                    print(f"DEBUG: Top 3 job scores: {[(job.role, job.match_score) for job in jobs[:3]]}")
+                except Exception as matching_error:
+                    print(f"ERROR: AI matching failed: {matching_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Fallback: set all scores to 0
                     for job in jobs:
                         job.match_score = 0
             else:
+                print("DEBUG: No resume text available - user needs to upload resume or apply to a job")
                 for job in jobs:
                     job.match_score = 0
                     
@@ -164,11 +205,10 @@ def user_dashboard():
             print(f"ERROR: Failed to calculate job matches: {e}")
             import traceback
             traceback.print_exc()
-            for job in jobs:
-                job.match_score = 0
+            # Jobs already have match_score = 0 from initialization above
+            print("DEBUG: Using fallback - all jobs scored 0 due to matching error")
     else:
-        for job in jobs:
-            job.match_score = 0
+        print("DEBUG: Matching not enabled - all jobs already scored 0")
     
     applied_job_ids = []
     
@@ -283,7 +323,13 @@ def edit_job(job_id):
         return redirect('/admin_dashboard')
     
     if request.method == 'GET':
-        applications = Application.query.filter_by(job_id=job_id).all()
+        # Use the same filtering as shortlist route for consistent scoring
+        applications = Application.query.filter(
+            Application.job_id == job_id,
+            Application.resume_text.isnot(None),
+            Application.resume_text != '',
+            ~Application.resume_text.like('Resume for %')
+        ).all()
         
         if applications and MATCHING_ENABLED:
             try:
@@ -296,7 +342,7 @@ def edit_job(job_id):
                 
                 score_dict = {app_id: score for app_id, score in rankings}
                 for app in applications:
-                    app.match_score = round(score_dict.get(app.id, 0), 2)
+                    app.match_score = round(score_dict.get(app.id, 0), 1)
                 
                 applications.sort(key=lambda x: x.match_score, reverse=True)
                 print(f"DEBUG: Ranked {len(applications)} applications for job {job_id}")
@@ -441,7 +487,8 @@ def apply_to_job(job_id):
             upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
             resume_path = os.path.join(upload_folder, user.resume)
             if os.path.exists(resume_path):
-                resume_text = extract_resume_text(resume_path)
+                # Extract resume text with NLP preprocessing enabled
+                resume_text = extract_resume_text(resume_path, preprocess=True)
         
         if not resume_text:
             resume_text = f"Resume for {user.full_name}"
